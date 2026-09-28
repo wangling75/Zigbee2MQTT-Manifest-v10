@@ -1,0 +1,205 @@
+name: Z2M Binary Bundle v10 CI/CD Pipeline
+
+on:
+  schedule:
+    # Daily check for a newly published zigbee-herdsman-converters version.
+    - cron: "17 2 * * *"
+  push:
+    branches: [ main, master ]
+    paths:
+      - "tools/**"
+      - "tests/**"
+      - "build_ir_frozen/**"
+      - ".github/workflows/z2m_binary_pipeline.yml"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    paths:
+      - "tools/**"
+      - "tests/**"
+      - ".github/workflows/z2m_binary_pipeline.yml"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+    inputs:
+      update_upstream:
+        description: "Install the latest zigbee-herdsman-converters before building"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: z2m-binary-bundle
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      zhc_version: ${{ steps.deps.outputs.zhc_version }}
+      bundle_changed: ${{ steps.candidate.outputs.bundle_changed }}
+      bundle_sha256: ${{ steps.candidate.outputs.bundle_sha256 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        id: deps
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "schedule" ]] || \
+             [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.update_upstream }}" == "true" ]]; then
+            LATEST=$(npm view zigbee-herdsman-converters version)
+            npm install --save-exact "zigbee-herdsman-converters@${LATEST}"
+          else
+            npm ci
+          fi
+          ZHC_VER=$(node --input-type=module -e "import pkg from 'zigbee-herdsman-converters/package.json' with { type: 'json' }; console.log(pkg.version);")
+          echo "zhc_version=${ZHC_VER}" >> "$GITHUB_OUTPUT"
+          echo "Locked zigbee-herdsman-converters version: ${ZHC_VER}"
+
+      - name: Build and fully validate candidate
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/build_candidate.py --keep-candidate
+          CANDIDATE=dist/z2m_bundle.candidate.bin
+          if [[ ! -f "${CANDIDATE}" ]]; then
+            echo "candidate bundle was not produced" >&2
+            exit 1
+          fi
+          CANDIDATE_SHA=$(sha256sum "${CANDIDATE}" | awk '{print $1}')
+          CURRENT=dist/z2m_bundle.bin
+          if [[ ! -f "${CURRENT}" ]]; then
+            echo "published bundle is missing; treating candidate as changed" >&2
+            BUNDLE_CHANGED=true
+          elif cmp -s "${CANDIDATE}" "${CURRENT}"; then
+            BUNDLE_CHANGED=false
+          else
+            BUNDLE_CHANGED=true
+          fi
+          echo "bundle_changed=${BUNDLE_CHANGED}" >> "$GITHUB_OUTPUT"
+          echo "bundle_sha256=${CANDIDATE_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Candidate bundle changed: ${BUNDLE_CHANGED} (${CANDIDATE_SHA})"
+
+      - name: Upload verified candidate
+        if: steps.candidate.outputs.bundle_changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: z2m-candidate-${{ steps.deps.outputs.zhc_version }}
+          if-no-files-found: error
+          path: |
+            build_ir_candidate/**
+            dist/z2m_bundle.candidate.bin
+            dist/z2m_manifest.candidate.json
+            package.json
+            package-lock.json
+
+  publish:
+    needs: validate
+    if: >-
+      needs.validate.outputs.bundle_changed == 'true' &&
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download verified candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: z2m-candidate-${{ needs.validate.outputs.zhc_version }}
+          path: .
+
+      - name: Read candidate version
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZHC_VER=$(python3 -c "import json; print(json.load(open('package.json'))['dependencies']['zigbee-herdsman-converters'])")
+          if [[ "${ZHC_VER}" != "${{ needs.validate.outputs.zhc_version }}" ]]; then
+            echo "artifact version ${ZHC_VER} does not match validated version ${{ needs.validate.outputs.zhc_version }}" >&2
+            exit 1
+          fi
+          echo "zhc_version=${ZHC_VER}" >> "$GITHUB_OUTPUT"
+          echo "Candidate zigbee-herdsman-converters version: ${ZHC_VER}"
+
+      - name: Promote verified candidate
+        run: |
+          python3 tools/build_candidate.py \
+            --promote \
+            --candidate-ir build_ir_candidate \
+            --candidate-bundle dist/z2m_bundle.candidate.bin \
+            --candidate-manifest dist/z2m_manifest.candidate.json
+
+      - name: Commit frozen IR and published assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json build_ir_frozen \
+            data/z2m_bundle.bin dist/z2m_bundle.bin dist/z2m_manifest.json public
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: publish Z2M bundle ${{ steps.candidate.outputs.zhc_version }}"
+            git push
+          else
+            echo "No frozen-bundle changes to commit."
+          fi
+
+      - name: Upload published artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: z2m-binary-bundle-v10-${{ steps.candidate.outputs.zhc_version }}
+          if-no-files-found: error
+          path: |
+            dist/z2m_bundle.bin
+            dist/z2m_manifest.json
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: z2m-binary-bundle-v${{ steps.candidate.outputs.zhc_version }}
+          name: "Z2M Binary Bundle v${{ steps.candidate.outputs.zhc_version }}"
+          draft: false
+          prerelease: false
+          files: |
+            dist/z2m_bundle.bin
+            dist/z2m_manifest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy GitHub Pages
+        uses: actions/deploy-pages@v4
