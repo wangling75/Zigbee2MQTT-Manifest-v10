@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zigbee2MQTT 自动同步 / 自定义 Manifest 服务搭建指南</title>
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --accent: #10b981;
+      --github: #8b5cf6;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --code-bg: #090d16;
+      --code-text: #38bdf8;
+      --badge-bg: rgba(2, 132, 199, 0.15);
+      --badge-border: rgba(2, 132, 199, 0.3);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      padding: 0;
+    }
+    .header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+      border-bottom: 1px solid var(--card-border);
+      padding: 3rem 1.5rem;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      background: linear-gradient(to right, #38bdf8, #818cf8, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.75rem;
+    }
+    .header p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      max-width: 850px;
+      margin: 0 auto;
+    }
+    .nav-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .nav-tab {
+      padding: 0.6rem 1.2rem;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+    .nav-tab:hover, .nav-tab.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+    }
+    .nav-tab.highlight {
+      background: rgba(139, 92, 246, 0.2);
+      border-color: #8b5cf6;
+      color: #c084fc;
+    }
+    .nav-tab.highlight:hover {
+      background: #8b5cf6;
+      color: #fff;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 2rem auto;
+      padding: 0 1.5rem 4rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.75rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+    .card-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1.2rem;
+      color: #e2e8f0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 0.75rem;
+    }
+    .card-title span.badge {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      background: var(--badge-bg);
+      border: 1px solid var(--badge-border);
+      color: #38bdf8;
+      border-radius: 9999px;
+      font-weight: 500;
+    }
+    .card-title span.badge-purple {
+      background: rgba(139, 92, 246, 0.15);
+      border-color: rgba(139, 92, 246, 0.4);
+      color: #c084fc;
+    }
+    h3 { font-size: 1.15rem; margin: 1.25rem 0 0.6rem; color: #38bdf8; }
+    p, ul, ol { margin-bottom: 1rem; color: #cbd5e1; font-size: 0.98rem; }
+    ul, ol { padding-left: 1.5rem; }
+    li { margin-bottom: 0.4rem; }
+    code {
+      background: rgba(0, 0, 0, 0.35);
+      color: #38bdf8;
+      padding: 0.2rem 0.45rem;
+      border-radius: 4px;
+      font-family: "JetBrains Mono", Consolas, Monaco, monospace;
+      font-size: 0.88em;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+      position: relative;
+    }
+    pre code {
+      background: none;
+      color: #e2e8f0;
+      padding: 0;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.75rem;
+      background: #334155;
+      color: #cbd5e1;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .copy-btn:hover { background: var(--primary); color: #fff; }
+    .alert {
+      background: rgba(2, 132, 199, 0.1);
+      border-left: 4px solid var(--primary);
+      padding: 1rem 1.2rem;
+      border-radius: 0 8px 8px 0;
+      margin: 1.2rem 0;
+    }
+    .alert-success { background: rgba(16, 185, 129, 0.1); border-left-color: var(--accent); }
+    .alert-warning { background: rgba(245, 158, 11, 0.1); border-left-color: #f59e0b; }
+    .alert-purple { background: rgba(139, 92, 246, 0.1); border-left-color: #8b5cf6; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem; margin: 1rem 0; }
+    .grid-item {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 1.2rem;
+      border-radius: 8px;
+    }
+    .grid-item h4 { color: #f8fafc; margin-bottom: 0.4rem; font-size: 1rem; }
+    
+    .step-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      background: #8b5cf6;
+      color: #fff;
+      font-weight: bold;
+      border-radius: 50%;
+      font-size: 0.85rem;
+      margin-right: 0.4rem;
+    }
+
+    /* Interactive playground */
+    .playground-box {
+      background: #090d16;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 1.2rem;
+      margin-top: 1rem;
+    }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.35rem; font-size: 0.9rem; color: #94a3b8; font-weight: 600; }
+    .form-control {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid #334155;
+      padding: 0.6rem 0.8rem;
+      color: #fff;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+    .form-control:focus { border-color: var(--primary); }
+    .btn {
+      padding: 0.6rem 1.2rem;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .diagram {
+      background: #090d16;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: center;
+      font-family: monospace;
+      color: #38bdf8;
+      overflow-x: auto;
+      line-height: 1.4;
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>🔄 Zigbee2MQTT 自动同步与 Manifest 服务搭建指南</h1>
+    <p>支持 100% 免费托管在 GitHub (Actions + Pages) 自动运行，或自建 Docker / Python 局域网服务</p>
+    <div class="nav-tabs">
+      <a href="#github-hosting" class="nav-tab highlight">☁️ GitHub 免费自动运行</a>
+      <a href="#arch" class="nav-tab">🏗️ 系统架构</a>
+      <a href="#quickstart" class="nav-tab">⚡ 局域网/自建部署</a>
+      <a href="#custom-dev" class="nav-tab">🛠️ 自定义私有设备</a>
+      <a href="#gateway-sync" class="nav-tab">📡 网关配置与同步</a>
+      <a href="#playground" class="nav-tab">🎮 在线生成测试</a>
+      <a href="#faq" class="nav-tab">❓ 常见问题排查</a>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- GitHub 免费全自动托管专区 -->
+    <div class="card" id="github-hosting" style="border-color: rgba(139, 92, 246, 0.4); background: linear-gradient(180deg, #1e293b 0%, #171c2e 100%);">
+      <div class="card-title">
+        <span style="color: #c084fc;">☁️ 核心推荐：GitHub Actions + Pages 100% 免费全自动托管</span>
+        <span class="badge badge-purple">Zero Maintenance</span>
+      </div>
+      <div class="alert alert-purple">
+        <strong>💡 为什么推荐直接托管在 GitHub？</strong><br>
+        1. <strong>完全免维护、0 费用</strong>：无需购买云服务器或在本地常开 NAS / 电脑。<br>
+        2. <strong>全自动定时每日更新</strong>：GitHub Actions 每天凌晨自动拉取 Z2M 官方最新 npm 库，提取新设备转换器。<br>
+        3. <strong>全球高速 HTTPS CDN 分发</strong>：GitHub Pages 提供全球 CDN 和自动 SSL 证书，ESP32-C3 可全球秒速同步！<br>
+        4. <strong>全量安全门禁</strong>：候选包必须通过布局校验和官方解析器全量差分，验证通过后才发布。
+      </div>
+
+      <h3>🛠️ 3 步在 GitHub 开启自动同步服务：</h3>
+
+      <div style="margin: 1.5rem 0;">
+        <p><span class="step-badge">1</span> <strong>新建 GitHub 仓库并上传代码</strong></p>
+        <p>将本套件解压后的 <code>z2m_manifest_server/</code> 目录内容上传至您的 GitHub 仓库（例如 <code>https://github.com/your-name/my-z2m-manifest</code>）。</p>
+        <pre><code># 仓库根目录应包含：
+├── .github/workflows/z2m_binary_pipeline.yml  # v10 自动工作流
+├── tools/                                     # IR 提取、编译器、校验器
+├── tests/                                     # 自包含 matcher 差分门禁
+├── build_ir_frozen/                           # 当前已验证冻结 IR
+└── tutorial.html</code></pre>
+      </div>
+
+      <div style="margin: 1.5rem 0;">
+        <p><span class="step-badge">2</span> <strong>在仓库中开启 GitHub Pages 权限</strong></p>
+        <ol>
+          <li>进入您的 GitHub 仓库页面，点击 <strong>Settings</strong>（设置）-> <strong>Pages</strong>。</li>
+          <li>在 <strong>Build and deployment</strong> 下的 <strong>Source</strong>（来源）下拉菜单中选择 <strong>GitHub Actions</strong>。</li>
+        </ol>
+      </div>
+
+      <div style="margin: 1.5rem 0;">
+        <p><span class="step-badge">3</span> <strong>触发首次运行并获取同步 URL</strong></p>
+        <ol>
+          <li>点击仓库顶部的 <strong>Actions</strong> 标签页 -> 选择 <strong>Z2M Binary Bundle v10 CI/CD Pipeline</strong>。</li>
+          <li>点击右侧 <strong>Run workflow</strong>（手动运行）按钮。</li>
+          <li>运行完成后，GitHub Pages 会自动生成您的专属 HTTPS 同步链接：
+            <br><code>https://&lt;你的用户名&gt;.github.io/&lt;仓库名&gt;/manifest.json</code>
+          </li>
+        </ol>
+      </div>
+
+      <div class="alert alert-success">
+        <strong>🎉 绑定到 ESP32 网关：</strong><br>
+        在终端向网关执行一条命令（或在网关网页后台粘贴该 URL）：
+        <pre><code>curl -X POST "http://192.168.2.249/api/z2m/sync?manifest=https://<你的用户名>.github.io/<仓库名>/manifest.json"</code><button class="copy-btn" onclick="copyCode(this)">复制</button></pre>
+        此后，无论何时 Z2M 官方发布新设备，网关都会在 24 小时内自动无缝静默拉取更新。
+      </div>
+    </div>
+
+    <!-- Section 1: 架构与工作原理 -->
+    <div class="card" id="arch">
+      <div class="card-title">
+        <span>🏗️ 架构与工作原理</span>
+        <span class="badge">Architecture</span>
+      </div>
+      <p>官方 <code>zigbee-herdsman-converters</code> (Z2M) 当前包含 4500+ 款 Zigbee 设备定义，但它们由 JavaScript/TypeScript 编写，并包含大量复杂的 JS 执行函数（如 <code>fromZigbee</code>、<code>toZigbee</code>、<code>configure</code> 等）。</p>
+      
+      <div class="alert alert-warning">
+        <strong>⚠️ 为什么不能在 ESP32 上直接运行 Z2M JS 文件？</strong><br>
+        ESP32-C3 的 RAM 仅有约 320KB（扣除 Wi-Fi、BLE、HomeKit 后可用仅 ~250KB），若嵌入 JavaScript 引擎执行 70MB+ 的 Z2M 脚本会导致内存直接溢出（OOM Panic）。
+      </div>
+
+      <p>因此，本项目采用了业界创新的 <strong>“云端/PC 预编译抽取 + ESP32 声明式极速解析”</strong> 架构：</p>
+
+      <div class="diagram">
+┌──────────────────────────────────────┐
+│  GitHub Actions (每天定时自动拉取)   │
+│  - 官方 Z2M 库 4500+ 设备            │
+└──────────────────┬───────────────────┘
+                   │
+                   ▼ [tools/build_candidate.py]
+┌────────────────────────────────────────────────────────┐
+│  GitHub Pages 全球 HTTPS CDN / 本地 Docker 输出端:     │
+│  • z2m_manifest.json (v10 元数据、SHA256、设备计数)     │
+│  • z2m_bundle.bin (Z2MB v10 二进制声明式规则包)         │
+└──────────────────┬─────────────────────────────────────┘
+                   │ HTTPS (GET z2m_manifest.json)
+                   ▼
+┌────────────────────────────────────────────────────────┐
+│  ESP32-S3 网关 (ZigbeeSync 引擎):                      │
+│  1. 校验 Z2MB v10、布局边界与 SHA-256 完整性            │
+│  2. 原子写入 LittleFS (/z2m_bundle.bin)                │
+│  3. 动态加载至 ConverterEngine 与 HomeKit / MQTT 桥接  │
+└────────────────────────────────────────────────────────┘</div>
+    </div>
+
+    <!-- Section 2: 局域网/自建部署 -->
+    <div class="card" id="quickstart">
+      <div class="card-title">
+        <span>⚡ 自建/局域网部署方式</span>
+        <span class="badge">Local Deploy</span>
+      </div>
+
+      <div class="grid">
+        <div class="grid-item">
+          <h4>方案 A：Docker 一键部署</h4>
+          <p>适用于 NAS、群晖、树莓派、Linux 服务器或本地电脑。</p>
+          <pre><code># 1. 进入服务目录
+cd tools/z2m_manifest_server
+
+# 2. 一键启动容器
+docker-compose up -d
+
+# 服务已在 http://你的IP:8088 启动！</code><button class="copy-btn" onclick="copyCode(this)">复制</button></pre>
+        </div>
+
+        <div class="grid-item">
+          <h4>方案 B：Python 零依赖极速启动</h4>
+          <p>无需安装任何第三方库，内置 Python 3 原生 HTTP 服务器。</p>
+          <pre><code># 1. 进入服务目录
+cd tools/z2m_manifest_server
+
+# 2. 启动服务 (默认端口 8088)
+python3 server.py
+
+# 访问 http://localhost:8088/manifest.json</code><button class="copy-btn" onclick="copyCode(this)">复制</button></pre>
+        </div>
+
+        <div class="grid-item">
+          <h4>方案 C：Nginx / Caddy 静态托管</h4>
+          <p>先完成候选构建与校验，再把 <code>public/</code> 作为静态目录托管。</p>
+          <pre><code># 构建、验证并提升正式 v10 发布物
+python3 tools/build_candidate.py --promote
+
+# Nginx 配置示例：
+location /z2m/ {
+    alias /var/www/z2m/;
+    add_header Access-Control-Allow-Origin *;
+}</code><button class="copy-btn" onclick="copyCode(this)">复制</button></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: 自定义私有设备定义 -->
+    <div class="card" id="custom-dev">
+      <div class="card-title">
+        <span>🛠️ 编写自定义私有 Zigbee 设备定义</span>
+        <span class="badge">Custom Converter</span>
+      </div>
+      <div class="alert alert-warning">
+        当前 v10 自动流水线以官方 <code>zigbee-herdsman-converters</code> 为唯一来源，不会自动合并旧版 <code>custom_devices.json</code>。私有设备需要后续单独扩展并经过同一套全量门禁后发布。
+      </div>
+      <p>下面是 v10 声明式 IR 的字段格式示例，仅供扩展开发参考：</p>
+
+      <pre><code>[
+  {
+    "model": "MY_CUSTOM_TEMP_SENSOR",
+    "models": ["MY_CUSTOM_TEMP_SENSOR", "DIY_TH_V1"],
+    "vendor": "MySmartHome",
+    "description": "DIY 电池供电温湿度传感器",
+    "matter_type": "temp_sensor",
+    "fromZigbee": [
+      {
+        "cluster": "0x0402",
+        "attr": "0x0000",
+        "type": "int16",
+        "multiply": 0.01,
+        "expose_to": "temperature"
+      },
+      {
+        "cluster": "0x0405",
+        "attr": "0x0000",
+        "type": "uint16",
+        "multiply": 0.01,
+        "expose_to": "humidity"
+      },
+      {
+        "cluster": "0x0001",
+        "attr": "0x0021",
+        "type": "uint8",
+        "multiply": 0.5,
+        "expose_to": "battery"
+      }
+    ],
+    "toZigbee": []
+  }
+]</code><button class="copy-btn" onclick="copyCode(this)">复制</button></pre>
+
+      <h3>常用 ZCL Cluster 与属性速查表</h3>
+      <ul>
+        <li><code>0x0006 / 0x0000</code> (bool): 开关状态 <code>state</code> (ON / OFF)</li>
+        <li><code>0x0008 / 0x0000</code> (uint8): 亮度等级 <code>brightness</code> (0~254)</li>
+        <li><code>0x0402 / 0x0000</code> (int16, multiply: 0.01): 摄氏温度 <code>temperature</code></li>
+        <li><code>0x0405 / 0x0000</code> (uint16, multiply: 0.01): 相对湿度 <code>humidity</code></li>
+        <li><code>0x0406 / 0x0000</code> (uint8): 人体移动/感应 <code>occupancy</code></li>
+        <li><code>0x0500 / 0x0002</code> (uint16): 门磁/水浸报警 <code>contact</code></li>
+        <li><code>0x0001 / 0x0021</code> (uint8, multiply: 0.5): 电池剩余百分比 <code>battery</code></li>
+      </ul>
+    </div>
+
+    <!-- Section 4: 网关配置与同步 -->
+    <div class="card" id="gateway-sync">
+      <div class="card-title">
+        <span>📡 网关配置与自动同步触发</span>
+        <span class="badge">Sync API</span>
+      </div>
+
+      <h3>方法 1：通过网关 REST API 一键绑定并立即同步</h3>
+      <pre><code># 将 <GATEWAY_IP> 替换为 ESP32 网关的局域网 IP (例如 192.168.2.249)
+# 将 <MANIFEST_URL> 替换为您的 GitHub Pages 或自建地址
+
+curl -X POST "http://192.168.2.249/api/z2m/sync?manifest=https://<你的用户名>.github.io/<仓库名>/manifest.json"</code><button class="copy-btn" onclick="copyCode(this)">复制</button></pre>
+
+      <p>网关返回示例：</p>
+      <pre><code>{
+  "status": "synced",
+  "devices": 3520,
+  "files": 2,
+  "manifest": "https://<你的用户名>.github.io/<仓库名>/manifest.json"
+}</code></pre>
+
+      <h3>方法 2：自动周期刷新机制</h3>
+      <p>一旦设置了 Manifest URL，ESP32 网关将保存该地址至 NVS，并满足以下特性：</p>
+      <ul>
+        <li><strong>每 24 小时自动静默检查更新</strong>：仅在版本或 SHA256 哈希变动时拉取，不浪费 Flash 寿命与网络带宽。</li>
+        <li><strong>断电记忆</strong>：网关重启后自动维持最新规则库。</li>
+        <li><strong>断网降级</strong>：无网络时自动使用内置烘焙的转换器库，保证核心设备离线可用。</li>
+      </ul>
+    </div>
+
+    <!-- Section 5: 在线交互测试 -->
+    <div class="card" id="playground">
+      <div class="card-title">
+        <span>🎮 在线自定义设备生成器</span>
+        <span class="badge">Interactive Tool</span>
+      </div>
+      <p>在下方输入您的设备信息，自动生成规范的 Z2M 转换器 JSON：</p>
+
+      <div class="playground-box">
+        <div class="form-group">
+          <label>设备 Model ID (Zigbee 广播型号):</label>
+          <input type="text" id="pg-model" class="form-control" value="TS0201_CUSTOM" placeholder="例如: TS0601, lumi.sensor_magnet">
+        </div>
+        <div class="form-group">
+          <label>厂商名称 (Vendor):</label>
+          <input type="text" id="pg-vendor" class="form-control" value="Tuya" placeholder="例如: Tuya, Aqara, Sonoff">
+        </div>
+        <div class="form-group">
+          <label>设备类型 (Matter / HomeKit 映射):</label>
+          <select id="pg-type" class="form-control">
+            <option value="temp_sensor">温湿度传感器 (Temperature & Humidity)</option>
+            <option value="contact_sensor">门磁开关传感器 (Contact Sensor)</option>
+            <option value="occupancy_sensor">人体移动传感器 (PIR Occupancy)</option>
+            <option value="on_off_switch">智能插座 / 继电器开关 (Smart Switch/Plug)</option>
+            <option value="dimmable_light">调光灯泡 (Dimmable Light)</option>
+          </select>
+        </div>
+        <button class="btn" onclick="generateCustomJson()">生成转换器 JSON</button>
+
+        <h4 style="margin-top: 1.2rem; color: #94a3b8;">生成结果预览:</h4>
+        <pre><code id="pg-output">// 点击上方按钮生成 JSON</code><button class="copy-btn" onclick="copyCode(this)">复制</button></pre>
+      </div>
+    </div>
+
+    <!-- Section 6: 常见问题排查 -->
+    <div class="card" id="faq">
+      <div class="card-title">
+        <span>❓ 常见问题与排查 (FAQ)</span>
+        <span class="badge">Troubleshooting</span>
+      </div>
+      <ul>
+        <li>
+          <strong>Q: ESP32 支持直接从 GitHub Pages HTTPS 地址下载吗？</strong><br>
+          A: 支持 HTTPS 下载。当前固件使用 <code>WiFiClientSecure::setInsecure()</code>，传输加密但不验证证书链；生产环境应使用可信域名和 Bundle 哈希校验。
+        </li>
+        <li>
+          <strong>Q: 提示 <code>SHA256 hash mismatch</code>？</strong><br>
+          A: 说明下载的文件哈希与 <code>manifest.json</code> 中的记录不一致。GitHub Actions 会在每次构建时自动重新计算准确的 SHA256。
+        </li>
+        <li>
+          <strong>Q: 官方收录新设备后需要改版本号吗？</strong><br>
+          A: 不需要手动改。定时任务会查询 npm 最新版，自动锁定版本、构建候选、跑全量门禁；只有二进制变化才提交并发版。
+        </li>
+      </ul>
+    </div>
+
+  </div>
+
+  <script>
+    function copyCode(btn) {
+      const pre = btn.parentElement;
+      const code = pre.querySelector("code").innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        const orig = btn.innerText;
+        btn.innerText = "已复制！";
+        btn.style.background = "#10b981";
+        setTimeout(() => {
+          btn.innerText = orig;
+          btn.style.background = "#334155";
+        }, 2000);
+      });
+    }
+
+    function generateCustomJson() {
+      const model = document.getElementById("pg-model").value.trim() || "CUSTOM_DEV";
+      const vendor = document.getElementById("pg-vendor").value.trim() || "Generic";
+      const type = document.getElementById("pg-type").value;
+
+      let fromZigbee = [];
+      let toZigbee = [];
+
+      if (type === "temp_sensor") {
+        fromZigbee = [
+          { cluster: "0x0402", attr: "0x0000", type: "int16", multiply: 0.01, expose_to: "temperature" },
+          { cluster: "0x0405", attr: "0x0000", type: "uint16", multiply: 0.01, expose_to: "humidity" },
+          { cluster: "0x0001", attr: "0x0021", type: "uint8", multiply: 0.5, expose_to: "battery" }
+        ];
+      } else if (type === "contact_sensor") {
+        fromZigbee = [
+          { cluster: "0x0500", attr: "0x0002", type: "uint16", multiply: 1, expose_to: "contact" },
+          { cluster: "0x0001", attr: "0x0021", type: "uint8", multiply: 0.5, expose_to: "battery" }
+        ];
+      } else if (type === "occupancy_sensor") {
+        fromZigbee = [
+          { cluster: "0x0406", attr: "0x0000", type: "uint8", multiply: 1, expose_to: "occupancy" },
+          { cluster: "0x0001", attr: "0x0021", type: "uint8", multiply: 0.5, expose_to: "battery" }
+        ];
+      } else if (type === "on_off_switch") {
+        fromZigbee = [
+          { cluster: "0x0006", attr: "0x0000", type: "bool", multiply: 1, expose_to: "state" }
+        ];
+        toZigbee = [
+          { field: "state", zcl_cluster: "0x0006", zcl_cmd: "0x02", zcl_cmd_on: "0x01", zcl_cmd_off: "0x00" }
+        ];
+      } else if (type === "dimmable_light") {
+        fromZigbee = [
+          { cluster: "0x0006", attr: "0x0000", type: "bool", multiply: 1, expose_to: "state" },
+          { cluster: "0x0008", attr: "0x0000", type: "uint8", multiply: 1, expose_to: "brightness" }
+        ];
+        toZigbee = [
+          { field: "state", zcl_cluster: "0x0006", zcl_cmd: "0x02", zcl_cmd_on: "0x01", zcl_cmd_off: "0x00" },
+          { field: "brightness", zcl_cluster: "0x0008", zcl_cmd: "0x04" }
+        ];
+      }
+
+      const devObj = {
+        model: model,
+        models: [model],
+        vendor: vendor,
+        description: `${vendor} ${model} 自定义设备`,
+        matter_type: type,
+        fromZigbee: fromZigbee,
+        toZigbee: toZigbee
+      };
+
+      document.getElementById("pg-output").innerText = JSON.stringify(devObj, null, 2);
+    }
+  </script>
+</body>
+</html>

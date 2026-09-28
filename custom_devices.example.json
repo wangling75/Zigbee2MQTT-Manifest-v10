@@ -1,0 +1,64 @@
+[
+  {
+    "model": "DIY_TEMP_HUMIDITY_V1",
+    "models": [
+      "DIY_TEMP_HUMIDITY_V1",
+      "DIY_TH_01"
+    ],
+    "vendor": "MyCustomVendor",
+    "description": "Custom DIY Battery Temperature & Humidity Sensor",
+    "matter_type": "temp_sensor",
+    "fromZigbee": [
+      {
+        "cluster": "0x0402",
+        "attr": "0x0000",
+        "type": "int16",
+        "multiply": 0.01,
+        "expose_to": "temperature"
+      },
+      {
+        "cluster": "0x0405",
+        "attr": "0x0000",
+        "type": "uint16",
+        "multiply": 0.01,
+        "expose_to": "humidity"
+      },
+      {
+        "cluster": "0x0001",
+        "attr": "0x0021",
+        "type": "uint8",
+        "multiply": 0.5,
+        "expose_to": "battery"
+      }
+    ],
+    "toZigbee": []
+  },
+  {
+    "model": "DIY_SMART_SWITCH_1G",
+    "models": [
+      "DIY_SMART_SWITCH_1G",
+      "MY_RELAY_01"
+    ],
+    "vendor": "MyCustomVendor",
+    "description": "Custom 1-Gang AC Relay Switch",
+    "matter_type": "on_off_switch",
+    "fromZigbee": [
+      {
+        "cluster": "0x0006",
+        "attr": "0x0000",
+        "type": "bool",
+        "multiply": 1,
+        "expose_to": "state"
+      }
+    ],
+    "toZigbee": [
+      {
+        "field": "state",
+        "zcl_cluster": "0x0006",
+        "zcl_cmd": "0x02",
+        "zcl_cmd_on": "0x01",
+        "zcl_cmd_off": "0x00"
+      }
+    ]
+  }
+]

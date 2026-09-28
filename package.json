@@ -1,0 +1,23 @@
+{
+  "name": "z2m-esp32-converter-platform",
+  "version": "10.0.0",
+  "description": "Zigbee2MQTT to ESP32 Converter Runtime Platform v10.0",
+  "main": "tools/z2m_bundle_generator.mjs",
+  "type": "module",
+  "scripts": {
+    "build:ir:candidate": "node tools/z2m_bundle_generator.mjs build_ir_candidate",
+    "build:bundle": "python3 tools/z2m_binary_compiler.py build_ir_frozen dist/z2m_bundle.bin dist/z2m_manifest.json",
+    "validate:bundle": "python3 tools/validate_bundle.py dist/z2m_bundle.bin dist/z2m_manifest.json",
+    "ci:full": "python3 tools/build_candidate.py",
+    "ci:candidate": "python3 tools/build_candidate.py --keep-candidate",
+    "ci:promote": "python3 tools/build_candidate.py --promote"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Koenkk/zigbee-herdsman-converters.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "zigbee-herdsman-converters": "26.112.0"
+  }
+}

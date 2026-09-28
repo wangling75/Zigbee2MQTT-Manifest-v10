@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  z2m-manifest-server:
+    build: .
+    container_name: z2m-manifest-server
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      - PORT=8088
+    volumes:
+      - ./dist:/app/dist
+      - ./public:/app/public
