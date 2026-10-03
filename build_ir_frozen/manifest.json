@@ -2,16 +2,16 @@
   "format": "z2m-esp32-manifest-v6",
   "version": "6.0.0",
   "ir_version": 6,
-  "generated_at": "2026-10-02T08:29:12.362Z",
+  "generated_at": "2026-10-03T08:04:21.543Z",
   "source": "zigbee-herdsman-converters",
-  "source_version": "26.115.2",
+  "source_version": "26.116.0",
   "bundle": "z2m_bundle.ndjson",
-  "sha256": "22af31d4e7bab75e767c2f1b5119b7237b71b7d0a45a232ad9c9506d147183a1",
-  "bytes": 17386334,
+  "sha256": "038c85f202cff0fd7e0934f9014004bcff01336ed21aac81e72e3f3f76e0d281",
+  "bytes": 17401758,
   "index": "z2m_index.json",
-  "index_sha256": "c189f4ba845555f0932086034729b86ac9700f63d80e74b5c5be1d256d03d638",
+  "index_sha256": "0c83afe19a1cb995c1d6b33382548634f574413777dd12906b39ea2fea085ed3",
   "index_bytes": 215534,
-  "device_count": 4560,
+  "device_count": 4563,
   "model_keys_count": 5084,
-  "fingerprint_keys_count": 2548
+  "fingerprint_keys_count": 2555
 }

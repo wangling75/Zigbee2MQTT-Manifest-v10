@@ -18,6 +18,6 @@
   },
   "license": "MIT",
   "dependencies": {
-    "zigbee-herdsman-converters": "26.115.2"
+    "zigbee-herdsman-converters": "26.116.0"
   }
 }
